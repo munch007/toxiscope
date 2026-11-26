@@ -9,18 +9,48 @@ from src.config import ALL_ENDPOINTS, LOW_SIM, HIGH_SIM
 from src.fingerprints import environment_atoms_bonds
 from src.prediction import Screener, ModelsMissing
 
-st.set_page_config(page_title="ToxiScope", page_icon="🧪", layout="wide")
+st.set_page_config(page_title="ToxiScope", page_icon="🧪", layout="centered")
+
+st.markdown("""
+<style>
+#MainMenu, footer, header {visibility:hidden;}
+.block-container {padding-top:1rem; max-width:760px;}
+.hero {background:linear-gradient(135deg,#0f766e,#1d4ed8); color:#fff; padding:22px 20px;
+       border-radius:18px; margin-bottom:14px;}
+.hero h1 {margin:0; font-size:2rem; color:#fff;}
+.hero p {margin:6px 0 0; opacity:.92; font-size:1rem;}
+.card {background:rgba(128,128,128,.10); border-radius:14px; padding:14px 16px; margin:10px 0;}
+.card .t {font-weight:700; font-size:1.05rem;}
+.card .d {opacity:.75; font-size:.88rem; margin:2px 0 8px;}
+.card .v {font-weight:700; margin-bottom:6px;}
+.card .s {opacity:.7; font-size:.8rem; margin-top:4px;}
+.bar {height:10px; background:rgba(128,128,128,.25); border-radius:6px; overflow:hidden;}
+.bar span {display:block; height:100%; border-radius:6px;}
+.badge {border-radius:14px; padding:14px 16px; margin:10px 0; color:#fff;}
+.badge b {font-size:1.05rem;} .badge div {font-size:.9rem; margin-top:3px; opacity:.95;}
+.stTabs [data-baseweb="tab"] {font-size:.95rem; padding:8px 10px;}
+</style>
+""", unsafe_allow_html=True)
 
 EXAMPLES = {
-    "Caffeine": "CN1C=NC2=C1C(=O)N(C(=O)N2C)C",
-    "Bisphenol A": "CC(C)(c1ccc(O)cc1)c1ccc(O)cc1",
-    "Benzo[a]pyrene": "c1ccc2c(c1)cc1ccc3cccc4ccc2c1c34",
-    "Aspirin": "CC(=O)Oc1ccccc1C(=O)O",
-    "Paracetamol": "CC(=O)Nc1ccc(O)cc1",
-    "Invalid input (test)": "this_is_not_smiles",
+    "☕ Caffeine": "CN1C=NC2=C1C(=O)N(C(=O)N2C)C",
+    "💊 Aspirin": "CC(=O)Oc1ccccc1C(=O)O",
+    "💊 Paracetamol": "CC(=O)Nc1ccc(O)cc1",
+    "💊 Ibuprofen": "CC(C)Cc1ccc(cc1)C(C)C(=O)O",
+    "🧴 Bisphenol A (plastics)": "CC(C)(c1ccc(O)cc1)c1ccc(O)cc1",
+    "🧴 Triclosan (antibacterial soap)": "Oc1cc(Cl)ccc1Oc1ccc(Cl)cc1Cl",
+    "🔥 Benzo[a]pyrene (smoke / grilled food)": "c1ccc2c(c1)cc1ccc3cccc4ccc2c1c34",
+    "🚬 Nicotine": "CN1CCCC1c1cccnc1",
+    "🛢️ Benzene": "c1ccccc1",
+    "🧿 Naphthalene (mothballs)": "c1ccc2ccccc2c1",
+    "🍺 Ethanol (alcohol)": "CCO",
+    "🍬 Glucose (sugar)": "OC[C@H]1OC(O)[C@H](O)[C@@H](O)[C@@H]1O",
 }
-DISCLAIMER = ("Research & education screening aid. Predicts **assay activity** from public Tox21 data — "
-              "it does **not** determine whether a chemical is toxic or safe for humans.")
+PLAIN = {
+    "NR-AhR": ("Pollutant alarm (AhR)", "Does it switch on the cell's alarm for pollutants like smoke and dioxins?"),
+    "SR-MMP": ("Cell power-plant damage", "Does it disturb mitochondria, the parts of a cell that make energy?"),
+    "SR-ARE": ("Oxidative stress", "Does it trigger the cell's 'rust' / damage-defence alarm?"),
+}
 
 
 @st.cache_resource
@@ -28,144 +58,173 @@ def get_screener():
     return Screener()
 
 
+st.markdown('<div class="hero"><h1>🧪 ToxiScope</h1><p>Pick a molecule. A computer model that learned from '
+            'thousands of real lab tests tells you which cell-stress alarms it might trigger — '
+            'and how much to trust that answer.</p></div>', unsafe_allow_html=True)
+
 try:
     S = get_screener()
 except ModelsMissing as e:
-    st.title("🧪 ToxiScope")
-    st.error(str(e))
-    st.stop()
+    st.error(str(e)); st.stop()
 
-page = st.sidebar.radio("Navigate", ["Home", "Molecule screening", "Model performance",
-                                     "Dataset & limitations"])
-st.sidebar.caption(DISCLAIMER)
+tab_try, tab_learn, tab_acc, tab_lim = st.tabs(["🔬 Try it", "📖 Learn", "📊 Accuracy", "⚠️ Limits"])
 
 
-def label_text(v):
-    return {1: "Active", 0: "Inactive"}.get(int(v), "Not tested")
+def plain(ep):
+    return PLAIN.get(ep, (ep, ALL_ENDPOINTS.get(ep, "")))
 
 
-# ------------------------------------------------------------------ Home
-if page == "Home":
-    st.title("🧪 ToxiScope")
-    st.subheader("Explainable chemical bioactivity screening")
-    st.info(DISCLAIMER)
-    st.markdown(
-        "**How it works**\n"
-        "1. Enter a molecule as SMILES and it is validated and converted to a Morgan fingerprint.\n"
-        "2. A Random Forest per Tox21 endpoint predicts assay activity.\n"
-        "3. The closest known molecules are retrieved (Tanimoto similarity) as supporting evidence.\n"
-        "4. If the molecule is too unlike the training data, ToxiScope warns you instead of "
-        "pretending to be confident.")
-    d = S.metrics["dataset"]
-    c = st.columns(4)
-    c[0].metric("Training molecules", f"{d['n_train']:,}")
-    c[1].metric("Held-out test molecules", f"{d['n_test']:,}")
-    c[2].metric("Endpoints", len(S.models))
-    c[3].metric("Split", "Scaffold")
-    st.caption("Go to **Molecule screening** in the sidebar to try it.")
+def card(ep, p):
+    title, desc = plain(ep)
+    flagged = p["active"]
+    color = "#dc2626" if flagged else "#64748b"
+    verdict = "🚩 Flagged: likely to trigger this test" if flagged else "Not flagged"
+    pct = max(2, int(round(p["score"] * 100)))
+    st.markdown(f'<div class="card" style="border-left:6px solid {color}"><div class="t">{title}</div>'
+                f'<div class="d">{desc}</div><div class="v" style="color:{color}">{verdict}</div>'
+                f'<div class="bar"><span style="width:{pct}%;background:{color}"></span></div>'
+                f'<div class="s">Model score {p["score"]:.2f} · flagged at {p["threshold"]:.2f} or higher</div></div>',
+                unsafe_allow_html=True)
 
-# ------------------------------------------------------------------ Screening
-elif page == "Molecule screening":
-    st.title("Molecule screening")
-    st.warning(DISCLAIMER)
-    ex = st.selectbox("Example molecules", ["(type your own)"] + list(EXAMPLES))
-    smi = st.text_input("SMILES", EXAMPLES.get(ex, "CC(C)(c1ccc(O)cc1)c1ccc(O)cc1"))
-    if st.button("Screen molecule", type="primary") or smi:
-        res = S.screen(smi)
-        if "error" in res:
-            st.error(res["error"]); st.stop()
 
-        left, right = st.columns([1, 2])
-        left.image(Draw.MolToImage(res["mol"], size=(320, 320)), caption=Chem.MolToSmiles(res["mol"]))
-        with right:
-            {"supported": st.success, "limited": st.warning, "outside": st.error}[res["level"]](
-                "**Evidence check:** " + res["message"])
-            st.caption(f"Similarity is a heuristic applicability-domain check (cut-offs {LOW_SIM} / {HIGH_SIM}), "
-                       "not a calibrated confidence score.")
-            show = True
-            if res["level"] == "outside":
-                show = st.checkbox("Show model output anyway (unreliable)")
-            if show:
-                rows = [{"Endpoint": ep, "Assay": S.metrics["endpoints"][ep]["description"],
-                         "Model score": round(p["score"], 3), "Decision threshold": round(p["threshold"], 3),
-                         "Predicted": "Active-like" if p["active"] else "Inactive-like",
-                         "Test ROC-AUC": round(S.metrics["endpoints"][ep]["roc_auc"], 3)}
-                        for ep, p in res["predictions"].items()]
-                st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
-                st.caption("Model score is a Random Forest output, not a calibrated probability of toxicity.")
+# ------------------------------------------------------------ TRY IT
+with tab_try:
+    choice = st.selectbox("1️⃣  Pick a molecule", list(EXAMPLES))
+    custom = st.text_input("…or paste your own SMILES code (optional — see the Learn tab)", "",
+                           placeholder="example: CCO")
+    smi = custom.strip() or EXAMPLES[choice]
+    res = S.screen(smi)
 
-        t1, t2 = st.tabs(["Why this prediction? (substructures)", "Similar known molecules"])
-        with t1:
-            ep = st.selectbox("Endpoint", list(res["predictions"]))
-            items = S.explain(res["mol"], res["fp"], ep)
-            st.caption("Each substructure is switched off in turn and the score re-computed. "
-                       "Red = pushes toward 'active', blue = pushes toward 'inactive'. "
-                       "This shows what the model relies on, not proven chemical causality.")
-            cols = st.columns(max(len(items), 1))
-            for col, it in zip(cols, items):
-                atoms, bonds = environment_atoms_bonds(res["mol"], *it["env"])
-                color = (0.9, 0.2, 0.2) if it["delta"] > 0 else (0.2, 0.4, 0.9)
-                img = Draw.MolToImage(res["mol"], size=(260, 260), highlightAtoms=atoms, highlightBonds=bonds,
-                                      highlightColor=color)
-                col.image(img, caption=f"Score change if removed: {-it['delta']:+.3f}")
-        with t2:
+    if "error" in res:
+        st.error("That isn't a valid molecule code. Clear the box, or pick one from the list.")
+    else:
+        st.image(Draw.MolToImage(res["mol"], size=(380, 300)), caption="Structure drawn by the computer")
+        look = {"supported": ("#16a34a", "Good evidence behind this result",
+                              "Very similar molecules were in the lab data the model learned from."),
+                "limited": ("#d97706", "Limited evidence — be careful",
+                            "Only somewhat similar molecules were in the training data."),
+                "outside": ("#dc2626", "Too unusual — don't trust this",
+                            "Nothing like it was in the training data, so the model is basically guessing.")}
+        col, head, sub = look[res["level"]]
+        st.markdown(f'<div class="badge" style="background:{col}"><b>{head}</b><div>{sub} '
+                    f'(closest known molecule: {res["max_sim"]*100:.0f}% similar)</div></div>',
+                    unsafe_allow_html=True)
+
+        show = True
+        if res["level"] == "outside":
+            show = st.checkbox("Show the model's guess anyway")
+        if show:
+            st.markdown("#### 2️⃣  What the model predicts")
+            for ep, p in res["predictions"].items():
+                card(ep, p)
+            st.caption("This predicts lab-test reactions only. **Not flagged ≠ safe**, and **flagged ≠ poisonous**.")
+
+            with st.expander("🧩 Which parts of the molecule drove this? (optional)"):
+                ep = st.selectbox("Test", list(res["predictions"]), format_func=lambda e: plain(e)[0])
+                items = S.explain(res["mol"], res["fp"], ep)
+                st.caption("We hide each small piece of the molecule and see how the score changes. "
+                           "🔴 red piece = pushes toward flagged, 🔵 blue = pushes away. "
+                           "It shows what the model relies on, not proven chemistry.")
+                for it in items:
+                    atoms, bonds = environment_atoms_bonds(res["mol"], *it["env"])
+                    color = (0.9, 0.2, 0.2) if it["delta"] > 0 else (0.2, 0.4, 0.9)
+                    st.image(Draw.MolToImage(res["mol"], size=(300, 220), highlightAtoms=atoms,
+                                             highlightBonds=bonds, highlightColor=color),
+                             caption=("Pushes toward flagged" if it["delta"] > 0 else "Pushes away from flagged")
+                             + f" ({it['delta']:+.2f})")
+
+        with st.expander("👯 Similar molecules the lab already tested"):
             nb = res["neighbors"]
-            st.image(Draw.MolsToGridImage([Chem.MolFromSmiles(s) for _, s, _ in nb], molsPerRow=3,
-                                          subImgSize=(230, 200),
-                                          legends=[f"Tanimoto {sim:.2f}" for sim, _, _ in nb]))
+            st.image(Draw.MolsToGridImage([Chem.MolFromSmiles(s) for _, s, _ in nb], molsPerRow=2,
+                                          subImgSize=(220, 190),
+                                          legends=[f"{sim*100:.0f}% similar" for sim, _, _ in nb]))
             eps = S.all_endpoints
-            tbl = [{"Tanimoto": round(sim, 3), "SMILES": s,
-                    **{e: label_text(lab[eps.index(e)]) for e in S.models}} for sim, s, lab in nb]
-            st.dataframe(pd.DataFrame(tbl), hide_index=True, use_container_width=True)
+            lab = lambda v: {1: "Active", 0: "Inactive"}.get(int(v), "Not tested")
+            st.dataframe(pd.DataFrame([{"Similarity": f"{sim*100:.0f}%", "SMILES": s,
+                                        **{plain(e)[0]: lab(l[eps.index(e)]) for e in S.models}}
+                                       for sim, s, l in nb]), hide_index=True)
+        st.caption(f"SMILES used: `{smi}`")
 
-# ------------------------------------------------------------------ Performance
-elif page == "Model performance":
-    st.title("Model performance")
-    st.caption("All numbers below were computed by `python -m src.training` on a held-out, "
-               "scaffold-split test set. The shipped models are exactly the ones evaluated.")
+# ------------------------------------------------------------ LEARN
+with tab_learn:
+    st.markdown("""
+### The idea in 30 seconds
+Scientists want to know early if a chemical might harm cells — but testing every chemical in a lab is slow and
+expensive. So a US government programme (**Tox21**) used robots to test about 8,000 chemicals on living cells.
+We trained a computer model on those results. Now it can *guess* what a new molecule would do — like a music app
+recommending songs based on what similar songs you liked.
+
+### "Since when does chemistry have models?"
+Since the **1960s**. The field is called **QSAR** (*quantitative structure–activity relationship*): the shape of a
+molecule predicts how it behaves. What's new is that we now use machine learning and big public datasets.
+
+### What is a SMILES?
+**A way to write a molecule as a line of text** so a computer can read it.
+- Letters are atoms: **C** carbon, **O** oxygen, **N** nitrogen, **Cl** chlorine
+- `=` is a double bond, digits like `1` open and close a ring, lowercase letters are ring atoms
+- `CCO` = ethanol (drinking alcohol) · `c1ccccc1` = benzene (a 6-carbon ring)
+
+You don't need to type one — the picker does it for you.
+
+### What the app does, step by step
+1. Reads the molecule and turns it into a **fingerprint** (a list of 2,048 yes/no flags: "has this small piece?").
+2. A **Random Forest** (hundreds of simple decision trees voting) predicts each lab test.
+3. Looks up the **most similar molecules** the lab really tested.
+4. If nothing similar exists, it **tells you not to trust the result**. That honesty is the main feature.
+
+### The 3 lab tests
+- **Pollutant alarm (AhR):** a sensor cells use against smoke and dioxin-type pollutants.
+- **Cell power-plant damage:** harm to mitochondria, the cell's energy factories.
+- **Oxidative stress:** the cell's damage-defence alarm, a bit like rust.
+""")
+
+# ------------------------------------------------------------ ACCURACY
+with tab_acc:
     E = S.metrics["endpoints"]
-    df = pd.DataFrame([{"Endpoint": k, "Test n": v["n_test"], "Train n": v["n_train"],
-                        "Active rate (test)": round(v["test_active_rate"], 3),
-                        "ROC-AUC": round(v["roc_auc"], 3), "PR-AUC": round(v["pr_auc"], 3),
+    st.markdown("Tested on molecules **the model never saw**, grouped so close relatives of training molecules "
+                "couldn't leak in. These numbers come from the real training run.")
+    for ep, v in E.items():
+        title, _ = plain(ep)
+        st.markdown(f'<div class="card"><div class="t">{title}</div>'
+                    f'<div class="d">ROC-AUC {v["roc_auc"]:.2f} (0.5 = coin flip, 1.0 = perfect)</div>'
+                    f'🎯 When it flags a molecule, it is right about <b>{v["precision"]*100:.0f}</b> times out of 100.<br>'
+                    f'🔎 It catches about <b>{v["recall"]*100:.0f}</b> of every 100 truly active molecules.</div>',
+                    unsafe_allow_html=True)
+    df = pd.DataFrame([{"Test": plain(k)[0], "ROC-AUC": round(v["roc_auc"], 3), "PR-AUC": round(v["pr_auc"], 3),
                         "Precision": round(v["precision"], 3), "Recall": round(v["recall"], 3),
-                        "F1": round(v["f1"], 3)} for k, v in E.items()])
-    st.dataframe(df, hide_index=True, use_container_width=True)
-    st.plotly_chart(px.bar(df.melt("Endpoint", ["ROC-AUC", "PR-AUC"]), x="Endpoint", y="value",
-                           color="variable", barmode="group", labels={"value": "score", "variable": ""}),
-                    use_container_width=True)
-    st.caption("PR-AUC should be read against the active rate: a random model scores about that value.")
-    ep = st.selectbox("Endpoint details", list(E))
+                        "Test molecules": v["n_test"]} for k, v in E.items()])
+    st.dataframe(df, hide_index=True)
+    st.plotly_chart(px.bar(df.melt("Test", ["ROC-AUC", "PR-AUC"]), x="Test", y="value", color="variable",
+                           barmode="group", labels={"value": "score", "variable": ""}))
+    st.markdown("#### Does 'unusual molecule' really mean worse accuracy? Yes:")
+    rows = []
+    for k, v in E.items():
+        for b in v["auc_by_similarity"]:
+            rows.append({"Test": plain(k)[0], "Similarity to training data": b["bin"],
+                         "Molecules": b["n"], "ROC-AUC": None if b["roc_auc"] is None else round(b["roc_auc"], 3)})
+    st.dataframe(pd.DataFrame(rows), hide_index=True)
+    ep = st.selectbox("Confusion matrix for", list(E), format_func=lambda e: plain(e)[0])
     cm = E[ep]["confusion_matrix"]
-    c1, c2 = st.columns(2)
-    fig = go.Figure(go.Heatmap(z=cm, x=["Pred inactive", "Pred active"], y=["True inactive", "True active"],
+    fig = go.Figure(go.Heatmap(z=cm, x=["Said no", "Said flagged"], y=["Truly inactive", "Truly active"],
                                text=cm, texttemplate="%{text}", colorscale="Blues", showscale=False))
     fig.update_yaxes(autorange="reversed")
-    c1.plotly_chart(fig, use_container_width=True)
-    c2.markdown("**ROC-AUC by similarity to training data**")
-    c2.dataframe(pd.DataFrame(E[ep]["auc_by_similarity"]).rename(
-        columns={"bin": "Nearest-neighbour Tanimoto", "n": "Test molecules", "roc_auc": "ROC-AUC"}),
-        hide_index=True)
-    c2.caption("Empty = fewer than 30 molecules or only one class. This is the evidence behind the "
-               "reliability warning: performance usually drops for dissimilar molecules.")
+    st.plotly_chart(fig)
 
-# ------------------------------------------------------------------ Limitations
-else:
-    st.title("Dataset & limitations")
+# ------------------------------------------------------------ LIMITS
+with tab_lim:
     d = S.metrics["dataset"]
     st.markdown(f"""
-**Data:** Tox21 (MoleculeNet release), {d['n_raw']:,} raw records → {d['n_valid_unique']:,} valid unique
-molecules ({d['n_invalid']} invalid, {d['n_duplicates']} duplicates removed; salts stripped to the largest fragment).
-Missing assay labels are left out per endpoint, never treated as inactive.
+### Please read
+- ⚠️ **This is a student research prototype, not a safety tool.** Never use it to decide a chemical is safe.
+- A lab-test reaction is **not** the same as poisoning a human. Some reactions come from cell damage or test noise.
+- Only **3 of the 12** Tox21 tests are modelled.
+- Predictions get less reliable for unusual molecules (see Accuracy tab). The similarity cut-offs
+  ({LOW_SIM:.2f} and {HIGH_SIM:.2f}) are rule-of-thumb values, not calibrated confidence.
+- Tools like EPA TEST and CompTox already predict toxicity this way. ToxiScope is a transparent teaching workflow,
+  not a new invention.
 
-**Split:** {d['split']} — molecules sharing a core scaffold are never in both train and test, so the metrics are
-not inflated by near-duplicates. Decision thresholds were chosen from out-of-bag predictions on the training set only.
-
-**Limitations**
-- Tox21 assay activity is **not** proven human toxicity. Activity can come from cytotoxicity or assay interference.
-- Active/inactive is based on single-concentration-series screens; labels are noisy.
-- Predictions are unreliable for molecules unlike the training set (see the evidence check and the AUC-by-similarity table).
-- Only {len(S.models)} of 12 Tox21 endpoints are modelled in this build.
-- Morgan-fingerprint QSAR, applicability-domain checks and toxicity prediction tools (e.g. EPA TEST, CompTox)
-  already exist; ToxiScope is a transparent educational workflow, not a novel method or a certified tool.
-- Never use this to declare a substance safe. Not a substitute for laboratory testing or toxicological assessment.
+### Data
+Tox21 (MoleculeNet release): {d['n_raw']:,} records → {d['n_valid_unique']:,} valid unique molecules
+({d['n_invalid']} invalid and {d['n_duplicates']} duplicates removed). Missing results are skipped, never counted as
+"inactive". Train/test split by molecular scaffold ({d['n_train']:,} / {d['n_test']:,}).
 """)

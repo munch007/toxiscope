@@ -1,0 +1,135 @@
+{
+  "dataset": {
+    "source": "Tox21 (MoleculeNet)",
+    "n_raw": 7831,
+    "n_valid_unique": 7709,
+    "n_invalid": 8,
+    "n_duplicates": 114,
+    "n_train": 6167,
+    "n_test": 1542,
+    "split": "Murcko scaffold split 80/20",
+    "test_max_sim_median": 0.39863014221191406
+  },
+  "endpoints": {
+    "NR-AhR": {
+      "n_train": 5242,
+      "n_test": 1201,
+      "train_active_rate": 0.11312476154139642,
+      "test_active_rate": 0.14238134887593673,
+      "threshold": 0.5290606200061516,
+      "roc_auc": 0.8343780162380061,
+      "pr_auc": 0.5200108592430026,
+      "precision": 0.6068376068376068,
+      "recall": 0.4152046783625731,
+      "f1": 0.4930555555555556,
+      "confusion_matrix": [
+        [
+          984,
+          46
+        ],
+        [
+          100,
+          71
+        ]
+      ],
+      "auc_by_similarity": [
+        {
+          "bin": "< 0.30",
+          "n": 267,
+          "roc_auc": 0.7260214430599826
+        },
+        {
+          "bin": "0.30 \u2013 0.50",
+          "n": 565,
+          "roc_auc": 0.8207070707070706
+        },
+        {
+          "bin": "\u2265 0.50",
+          "n": 369,
+          "roc_auc": 0.8977538854588035
+        }
+      ],
+      "description": "Aryl hydrocarbon receptor activation"
+    },
+    "SR-MMP": {
+      "n_train": 4716,
+      "n_test": 1004,
+      "train_active_rate": 0.14821882951653945,
+      "test_active_rate": 0.20717131474103587,
+      "threshold": 0.5837610091645581,
+      "roc_auc": 0.8046029425976035,
+      "pr_auc": 0.5230401581564585,
+      "precision": 0.6122448979591837,
+      "recall": 0.14423076923076922,
+      "f1": 0.23346303501945526,
+      "confusion_matrix": [
+        [
+          777,
+          19
+        ],
+        [
+          178,
+          30
+        ]
+      ],
+      "auc_by_similarity": [
+        {
+          "bin": "< 0.30",
+          "n": 220,
+          "roc_auc": 0.7593688362919132
+        },
+        {
+          "bin": "0.30 \u2013 0.50",
+          "n": 472,
+          "roc_auc": 0.7962789243277049
+        },
+        {
+          "bin": "\u2265 0.50",
+          "n": 312,
+          "roc_auc": 0.8396343178621659
+        }
+      ],
+      "description": "Mitochondrial membrane potential disruption"
+    },
+    "SR-ARE": {
+      "n_train": 4809,
+      "n_test": 932,
+      "train_active_rate": 0.14410480349344978,
+      "test_active_rate": 0.2446351931330472,
+      "threshold": 0.43813076004282764,
+      "roc_auc": 0.7103799092902712,
+      "pr_auc": 0.4508040964732454,
+      "precision": 0.45569620253164556,
+      "recall": 0.3157894736842105,
+      "f1": 0.37305699481865284,
+      "confusion_matrix": [
+        [
+          618,
+          86
+        ],
+        [
+          156,
+          72
+        ]
+      ],
+      "auc_by_similarity": [
+        {
+          "bin": "< 0.30",
+          "n": 183,
+          "roc_auc": 0.6524137931034483
+        },
+        {
+          "bin": "0.30 \u2013 0.50",
+          "n": 462,
+          "roc_auc": 0.6569759580279633
+        },
+        {
+          "bin": "\u2265 0.50",
+          "n": 287,
+          "roc_auc": 0.8165875169606512
+        }
+      ],
+      "description": "Antioxidant response element (oxidative stress)"
+    }
+  }
+}
